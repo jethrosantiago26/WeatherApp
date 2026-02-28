@@ -1,79 +1,53 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  TouchableOpacity,
+  FlatList,
+  RefreshControl,
 } from 'react-native';
 import { useWeather } from '../context/WeatherContext';
+import {
+  getWeatherIcon,
+  getWeatherDescription,
+  formatDate,
+  windDirectionLabel,
+  COLORS,
+} from '../utils/weather';
 
-const WEATHER_DESCRIPTIONS = {
-  0: 'Clear sky',
-  1: 'Mainly clear',
-  2: 'Partly cloudy',
-  3: 'Overcast',
-  45: 'Foggy',
-  48: 'Rime fog',
-  51: 'Light drizzle',
-  53: 'Moderate drizzle',
-  55: 'Dense drizzle',
-  61: 'Slight rain',
-  63: 'Moderate rain',
-  65: 'Heavy rain',
-  71: 'Slight snow',
-  73: 'Moderate snow',
-  75: 'Heavy snow',
-  80: 'Slight showers',
-  81: 'Moderate showers',
-  82: 'Violent showers',
-  95: 'Thunderstorm',
-  96: 'Thunderstorm w/ hail',
-  99: 'Thunderstorm w/ heavy hail',
-};
-
-const WEATHER_ICONS = {
-  0: '☀️',
-  1: '🌤️',
-  2: '⛅',
-  3: '☁️',
-  45: '🌫️',
-  48: '🌫️',
-  51: '🌦️',
-  53: '🌧️',
-  55: '🌧️',
-  61: '🌧️',
-  63: '🌧️',
-  65: '🌧️',
-  71: '🌨️',
-  73: '🌨️',
-  75: '❄️',
-  80: '🌦️',
-  81: '🌧️',
-  82: '⛈️',
-  95: '⛈️',
-  96: '⛈️',
-  99: '⛈️',
-};
-
-const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-function formatDate(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00');
-  return `${DAY_NAMES[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`;
+function formatHour(isoString) {
+  const d = new Date(isoString);
+  const h = d.getHours();
+  if (h === 0) return '12AM';
+  if (h === 12) return '12PM';
+  return h > 12 ? `${h - 12}PM` : `${h}AM`;
 }
 
-function windDirection(deg) {
-  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-  return dirs[Math.round(deg / 45) % 8];
+function formatTime(isoString) {
+  if (!isoString) return '--:--';
+  const d = new Date(isoString);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export default function DetailsScreen({ route }) {
+export default function DetailsScreen({ route, navigation }) {
   const { cityName } = route.params;
-  const { cities, weatherData, loading, error, fetchWeather } = useWeather();
+  const {
+    cities,
+    weatherData,
+    loading,
+    error,
+    lastUpdated,
+    fetchWeather,
+    isFavorite,
+    toggleFavorite,
+  } = useWeather();
 
   const city = cities.find((c) => c.name === cityName);
   const data = weatherData[cityName];
+  const fav = isFavorite(cityName);
 
   useEffect(() => {
     if (city && !data) {
@@ -81,10 +55,28 @@ export default function DetailsScreen({ route }) {
     }
   }, [cityName]);
 
+  // Set header right button for favorite
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => toggleFavorite(cityName)}
+          style={{ marginRight: 8 }}
+        >
+          <Text style={{ fontSize: 22 }}>{fav ? '⭐' : '☆'}</Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, fav, cityName]);
+
+  const handleRefresh = useCallback(() => {
+    if (city) fetchWeather(city);
+  }, [city]);
+
   if (loading && !data) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#4A90D9" />
+        <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={styles.loadingText}>Loading weather data…</Text>
       </View>
     );
@@ -94,6 +86,9 @@ export default function DetailsScreen({ route }) {
     return (
       <View style={styles.center}>
         <Text style={styles.errorText}>⚠️ {error}</Text>
+        <TouchableOpacity style={styles.retryBtn} onPress={handleRefresh}>
+          <Text style={styles.retryText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -108,31 +103,99 @@ export default function DetailsScreen({ route }) {
 
   const current = data.current;
   const daily = data.daily;
+  const hourly = data.hourly;
   const weatherCode = current.weather_code;
+
+  // Get the next 24 hours of hourly data
+  const now = new Date();
+  const hourlySlice = [];
+  if (hourly) {
+    for (let i = 0; i < hourly.time.length && hourlySlice.length < 24; i++) {
+      if (new Date(hourly.time[i]) >= now) {
+        hourlySlice.push({
+          time: hourly.time[i],
+          temp: hourly.temperature_2m[i],
+          code: hourly.weather_code[i],
+          precip: hourly.precipitation_probability[i],
+        });
+      }
+    }
+  }
+
+  const lastUp = lastUpdated[cityName]
+    ? new Date(lastUpdated[cityName]).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : null;
 
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={handleRefresh}
+          tintColor={COLORS.primary}
+          colors={[COLORS.primary]}
+        />
+      }
     >
       {/* Current Weather Hero */}
       <View style={styles.heroCard}>
-        <Text style={styles.heroIcon}>
-          {WEATHER_ICONS[weatherCode] || '🌡️'}
-        </Text>
+        <Text style={styles.heroIcon}>{getWeatherIcon(weatherCode)}</Text>
         <Text style={styles.heroTemp}>
           {Math.round(current.temperature_2m)}°C
         </Text>
         <Text style={styles.heroDesc}>
-          {WEATHER_DESCRIPTIONS[weatherCode] || 'Unknown'}
+          {getWeatherDescription(weatherCode)}
         </Text>
         <Text style={styles.heroFeelsLike}>
           Feels like {Math.round(current.apparent_temperature)}°C
         </Text>
+        {daily && (
+          <Text style={styles.heroHiLo}>
+            H:{Math.round(daily.temperature_2m_max[0])}° L:
+            {Math.round(daily.temperature_2m_min[0])}°
+          </Text>
+        )}
+        {lastUp && (
+          <Text style={styles.heroUpdated}>Updated at {lastUp}</Text>
+        )}
       </View>
 
+      {/* Hourly Forecast */}
+      {hourlySlice.length > 0 && (
+        <>
+          <Text style={styles.sectionTitle}>Next 24 Hours</Text>
+          <FlatList
+            horizontal
+            data={hourlySlice}
+            keyExtractor={(item) => item.time}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.hourlyList}
+            renderItem={({ item }) => (
+              <View style={styles.hourlyItem}>
+                <Text style={styles.hourlyTime}>{formatHour(item.time)}</Text>
+                <Text style={styles.hourlyIcon}>
+                  {getWeatherIcon(item.code)}
+                </Text>
+                <Text style={styles.hourlyTemp}>
+                  {Math.round(item.temp)}°
+                </Text>
+                {item.precip > 0 && (
+                  <Text style={styles.hourlyPrecip}>💧{item.precip}%</Text>
+                )}
+              </View>
+            )}
+          />
+        </>
+      )}
+
       {/* Current Details Grid */}
+      <Text style={styles.sectionTitle}>Current Conditions</Text>
       <View style={styles.detailsGrid}>
         <View style={styles.detailItem}>
           <Text style={styles.detailIcon}>💧</Text>
@@ -151,39 +214,121 @@ export default function DetailsScreen({ route }) {
         <View style={styles.detailItem}>
           <Text style={styles.detailIcon}>🧭</Text>
           <Text style={styles.detailValue}>
-            {windDirection(current.wind_direction_10m)}
+            {windDirectionLabel(current.wind_direction_10m)}
           </Text>
           <Text style={styles.detailLabel}>Direction</Text>
         </View>
       </View>
 
-      {/* 5-Day Forecast */}
-      <Text style={styles.sectionTitle}>5-Day Forecast</Text>
-      {daily &&
-        daily.time.map((date, index) => (
-          <View key={date} style={styles.forecastRow}>
-            <Text style={styles.forecastDay}>{formatDate(date)}</Text>
-            <Text style={styles.forecastIcon}>
-              {WEATHER_ICONS[daily.weather_code[index]] || '🌡️'}
-            </Text>
-            <View style={styles.forecastTemps}>
-              <Text style={styles.forecastHigh}>
-                {Math.round(daily.temperature_2m_max[index])}°
+      <View style={styles.detailsGrid}>
+        <View style={styles.detailItem}>
+          <Text style={styles.detailIcon}>🔵</Text>
+          <Text style={styles.detailValue}>
+            {current.surface_pressure
+              ? `${Math.round(current.surface_pressure)} hPa`
+              : '—'}
+          </Text>
+          <Text style={styles.detailLabel}>Pressure</Text>
+        </View>
+        {daily && (
+          <>
+            <View style={styles.detailItem}>
+              <Text style={styles.detailIcon}>☀️</Text>
+              <Text style={styles.detailValue}>
+                {daily.uv_index_max ? daily.uv_index_max[0]?.toFixed(1) : '—'}
               </Text>
-              <Text style={styles.forecastLow}>
-                {Math.round(daily.temperature_2m_min[index])}°
-              </Text>
+              <Text style={styles.detailLabel}>UV Index</Text>
             </View>
-            <Text style={styles.forecastRain}>
-              💧 {daily.precipitation_sum[index]} mm
+            <View style={styles.detailItem}>
+              <Text style={styles.detailIcon}>🌧️</Text>
+              <Text style={styles.detailValue}>
+                {daily.precipitation_sum
+                  ? `${daily.precipitation_sum[0]} mm`
+                  : '—'}
+              </Text>
+              <Text style={styles.detailLabel}>Precip.</Text>
+            </View>
+          </>
+        )}
+      </View>
+
+      {/* Sunrise / Sunset */}
+      {daily && daily.sunrise && daily.sunset && (
+        <View style={styles.sunRow}>
+          <View style={styles.sunItem}>
+            <Text style={styles.sunIcon}>🌅</Text>
+            <Text style={styles.sunLabel}>Sunrise</Text>
+            <Text style={styles.sunValue}>
+              {formatTime(daily.sunrise[0])}
             </Text>
           </View>
-        ))}
+          <View style={styles.sunDivider} />
+          <View style={styles.sunItem}>
+            <Text style={styles.sunIcon}>🌇</Text>
+            <Text style={styles.sunLabel}>Sunset</Text>
+            <Text style={styles.sunValue}>
+              {formatTime(daily.sunset[0])}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* 7-Day Forecast */}
+      <Text style={styles.sectionTitle}>7-Day Forecast</Text>
+      {daily &&
+        daily.time.map((date, index) => {
+          const isToday = index === 0;
+          return (
+            <View
+              key={date}
+              style={[styles.forecastRow, isToday && styles.forecastToday]}
+            >
+              <Text style={styles.forecastDay}>
+                {isToday ? 'Today' : formatDate(date)}
+              </Text>
+              <Text style={styles.forecastIcon}>
+                {getWeatherIcon(daily.weather_code[index])}
+              </Text>
+              <View style={styles.forecastTemps}>
+                <Text style={styles.forecastHigh}>
+                  {Math.round(daily.temperature_2m_max[index])}°
+                </Text>
+                {/* Temperature bar */}
+                <View style={styles.tempBarContainer}>
+                  <View
+                    style={[
+                      styles.tempBar,
+                      {
+                        width: `${Math.max(
+                          20,
+                          ((daily.temperature_2m_max[index] -
+                            daily.temperature_2m_min[index]) /
+                            30) *
+                            100
+                        )}%`,
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.forecastLow}>
+                  {Math.round(daily.temperature_2m_min[index])}°
+                </Text>
+              </View>
+              <Text style={styles.forecastRain}>
+                💧{daily.precipitation_sum[index]}mm
+              </Text>
+            </View>
+          );
+        })}
 
       {/* Coordinates */}
       <View style={styles.coordBox}>
         <Text style={styles.coordText}>
           📍 {city?.latitude?.toFixed(4)}, {city?.longitude?.toFixed(4)}
+          {city?.country ? ` · ${city.country}` : ''}
+        </Text>
+        <Text style={styles.coordText}>
+          Data from Open-Meteo API
         </Text>
       </View>
     </ScrollView>
@@ -193,70 +338,140 @@ export default function DetailsScreen({ route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#E6F4FE',
+    backgroundColor: COLORS.background,
   },
   content: {
     padding: 16,
-    paddingBottom: 32,
+    paddingBottom: 40,
   },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#E6F4FE',
+    backgroundColor: COLORS.background,
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#6B8DAF',
+    color: COLORS.textSecondary,
   },
   errorText: {
     fontSize: 16,
-    color: '#856404',
+    color: COLORS.warningText,
+  },
+  retryBtn: {
+    marginTop: 16,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 15,
   },
 
   /* Hero */
   heroCard: {
-    backgroundColor: '#4A90D9',
-    borderRadius: 20,
+    backgroundColor: COLORS.primary,
+    borderRadius: 24,
     padding: 28,
     alignItems: 'center',
-    marginBottom: 16,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
+    marginBottom: 18,
+    elevation: 6,
+    shadowColor: COLORS.primaryDark,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   heroIcon: {
-    fontSize: 64,
+    fontSize: 72,
   },
   heroTemp: {
-    fontSize: 52,
-    fontWeight: 'bold',
+    fontSize: 56,
+    fontWeight: '800',
     color: '#FFFFFF',
     marginTop: 4,
   },
   heroDesc: {
-    fontSize: 18,
+    fontSize: 19,
     color: '#D4E8FA',
     marginTop: 4,
+    fontWeight: '500',
   },
   heroFeelsLike: {
     fontSize: 14,
     color: '#B8D4F0',
     marginTop: 6,
   },
+  heroHiLo: {
+    fontSize: 14,
+    color: '#C8DFF5',
+    marginTop: 4,
+    fontWeight: '600',
+  },
+  heroUpdated: {
+    fontSize: 11,
+    color: '#A0C4E8',
+    marginTop: 8,
+  },
+
+  /* Section */
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: 10,
+    marginTop: 6,
+  },
+
+  /* Hourly */
+  hourlyList: {
+    paddingBottom: 14,
+  },
+  hourlyItem: {
+    backgroundColor: COLORS.card,
+    borderRadius: 14,
+    padding: 12,
+    marginRight: 10,
+    alignItems: 'center',
+    minWidth: 68,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+  },
+  hourlyTime: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  hourlyIcon: {
+    fontSize: 24,
+    marginVertical: 6,
+  },
+  hourlyTemp: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  hourlyPrecip: {
+    fontSize: 10,
+    color: COLORS.primary,
+    marginTop: 3,
+  },
 
   /* Details Grid */
   detailsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 10,
   },
   detailItem: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.card,
     borderRadius: 14,
     padding: 14,
     marginHorizontal: 4,
@@ -268,81 +483,136 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
   },
   detailIcon: {
-    fontSize: 24,
+    fontSize: 22,
   },
   detailValue: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#1A3A5C',
+    color: COLORS.textPrimary,
     marginTop: 6,
+    textAlign: 'center',
   },
   detailLabel: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+
+  /* Sun row */
+  sunRow: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.card,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+    marginTop: 6,
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+  },
+  sunItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  sunDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#E0E8F0',
+  },
+  sunIcon: {
+    fontSize: 26,
+  },
+  sunLabel: {
     fontSize: 12,
-    color: '#7BA3C7',
+    color: COLORS.textSecondary,
+    marginTop: 4,
+  },
+  sunValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
     marginTop: 2,
   },
 
   /* Forecast */
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1A3A5C',
-    marginBottom: 10,
-  },
   forecastRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.card,
     borderRadius: 12,
-    padding: 14,
-    marginBottom: 8,
+    padding: 13,
+    marginBottom: 6,
     elevation: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 2,
   },
+  forecastToday: {
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.primary,
+  },
   forecastDay: {
-    width: 70,
-    fontSize: 14,
+    width: 60,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#1A3A5C',
+    color: COLORS.textPrimary,
   },
   forecastIcon: {
-    fontSize: 24,
-    width: 40,
+    fontSize: 22,
+    width: 36,
     textAlign: 'center',
   },
   forecastTemps: {
     flex: 1,
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 4,
   },
   forecastHigh: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#D94A4A',
+    color: COLORS.danger,
+    width: 32,
+    textAlign: 'right',
   },
   forecastLow: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#4A90D9',
+    color: COLORS.primary,
+    width: 32,
+  },
+  tempBarContainer: {
+    flex: 1,
+    height: 4,
+    backgroundColor: '#E8F0F8',
+    borderRadius: 2,
+  },
+  tempBar: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: COLORS.accent,
   },
   forecastRain: {
-    fontSize: 12,
-    color: '#6B8DAF',
-    width: 70,
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    width: 58,
     textAlign: 'right',
   },
 
   /* Coordinates */
   coordBox: {
-    marginTop: 12,
+    marginTop: 16,
     alignItems: 'center',
+    paddingBottom: 8,
   },
   coordText: {
-    fontSize: 12,
-    color: '#99B5CC',
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 2,
   },
 });
