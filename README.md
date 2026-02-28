@@ -1,1 +1,80 @@
-<pre> # 🌦️ WeatherApp A feature-rich mobile weather application built with **React Native (Expo)**. Get real-time weather data for cities worldwide, save your favorites, add custom locations, and toggle between Celsius and Fahrenheit — all in a clean, modern UI. ![Platform](https://img.shields.io/badge/Platform-Android-green?logo=android) ![Framework](https://img.shields.io/badge/Framework-React%20Native-blue?logo=react) ![Expo](https://img.shields.io/badge/Expo-SDK%2055-black?logo=expo) ![API](https://img.shields.io/badge/API-Open--Meteo-orange) ![License](https://img.shields.io/badge/License-MIT-yellow) --- ## 📱 Download APK 👉 [**Download latest APK**](https://expo.dev/accounts/jethzki/projects/WeatherApp/builds/e3ba7cad-38d4-46d3-9151-92176f0e593f) --- ## ✨ Features ### 🏠 Home Screen - View weather for **12 pre-loaded cities** across the globe - **Search & filter** cities from the list - **Add custom cities** worldwide via geocoding search (modal with real-time results) - **Favorites system** — favorite cities are pinned to the top with a gold highlight - **Skeleton loading** animation while data loads - **Pull-to-refresh** to update all weather data - Navigate to **Settings** or **Details** with a tap ### 📊 Details Screen - **Gradient hero card** showing current temperature, condition, and "feels like" - **24-hour hourly forecast** with horizontal scroll - **7-day forecast** with temperature range bars - **Conditions grid**: Humidity, Wind Speed, UV Index, Pressure - **Color-coded UV Index** badge (Low → Extreme) - **Wind level descriptions** (Calm, Breeze, Moderate, Strong, Storm) - **Sunrise & Sunset** times - **Relative timestamps** ("5m ago", "2h ago") - **Favorite toggle** directly from the header - Pull-to-refresh support ### ⚙️ Settings Screen - **Temperature unit toggle** — switch between °C and °F (persisted) - **Manage favorites** — view and remove favorited cities - **Manage custom cities** — view and remove user-added cities (with confirmation dialog) - **About section** — data source attribution and app version --- ## 🛠️ Tech Stack | Category | Technology | |---|---| | **Framework** | React Native (Expo SDK 55) | | **Language** | JavaScript (ES6+) | | **Navigation** | React Navigation v7 (Native Stack) | | **State Management** | React Context API + `useReducer` | | **Local Storage** | AsyncStorage | | **API** | [Open-Meteo API](https://open-meteo.com/) (free, no API key required) | | **Geocoding** | Open-Meteo Geocoding API | | **UI Gradient** | expo-linear-gradient | | **Build Tool** | EAS Build (Expo Application Services) | | **Platform** | Android (APK) | --- ## 📂 Project Structure ``` WeatherApp/ ├── App.js # Entry point — Navigation + Provider setup ├── app.json # Expo configuration ├── eas.json # EAS Build profiles ├── package.json # Dependencies ├── index.js # App registry ├── assets/ # App icons and splash screen └── src/ ├── context/ │ └── WeatherContext.js # Global state (useReducer + Context) ├── screens/ │ ├── HomeScreen.js # City list, search, add-city modal │ ├── DetailsScreen.js # Detailed weather view with charts │ └── SettingsScreen.js # Preferences and management └── utils/ └── weather.js # Constants, helpers, color palette ``` --- ## 🚀 Getting Started ### Prerequisites - [Node.js](https://nodejs.org/) (v18 or later) - [Expo CLI](https://docs.expo.dev/get-started/installation/) - [Expo Go](https://expo.dev/go) app on your Android/iOS device (for development) ### Installation ```bash # Clone the repository git clone https://github.com/jethrosantiago26/WeatherApp.git cd WeatherApp # Install dependencies npm install # Start the development server npx expo start ``` Scan the QR code with **Expo Go** on your phone to run the app. ### Build APK ```bash # Install EAS CLI npm install -g eas-cli # Login to Expo npx expo login # Build Android APK eas build --platform android --profile preview ``` --- ## 🌐 API Reference This app uses the **Open-Meteo API** — a free, open-source weather API that requires no API key. | Endpoint | Purpose | |---|---| | `api.open-meteo.com/v1/forecast` | Current weather, hourly & daily forecasts | | `geocoding-api.open-meteo.com/v1/search` | City search by name (geocoding) | **Data includes:** Temperature, humidity, wind speed & direction, UV index, pressure, precipitation, weather codes, sunrise/sunset times, and more. --- ## 📦 Key Dependencies | Package | Version | Purpose | |---|---|---| | `react` | 19.2.0 | UI library | | `react-native` | 0.83.2 | Mobile framework | | `expo` | ~55.0.4 | Development platform | | `@react-navigation/native` | ^7 | Screen navigation | | `@react-navigation/native-stack` | ^7 | Stack navigator | | `@react-native-async-storage/async-storage` | 2.2.0 | Persistent storage | | `expo-linear-gradient` | ~14.1.4 | Gradient backgrounds | --- ## 👤 Author **Jethro Santiago** - GitHub: [@jethrosantiago26](https://github.com/jethrosantiago26) --- ## 📄 License This project is open source and available under the MIT License. --- ## 🙏 Acknowledgments - [Open-Meteo](https://open-meteo.com/) for the free weather API - [Expo](https://expo.dev/) for the React Native development platform - [React Navigation](https://reactnavigation.org/) for seamless screen navigation </pre>
+🌦️ WeatherApp
+
+A modern mobile weather app built with React Native (Expo).
+Get real-time weather worldwide, save favorites, add custom cities, and switch between °C / °F — all in a clean UI.
+
+
+
+
+
+
+
+
+
+
+📱 Download APK
+
+👉 Download latest APK:
+https://expo.dev/accounts/jethzki/projects/WeatherApp/builds/e3ba7cad-38d4-46d3-9151-92176f0e593f
+
+✨ Features
+🏠 Home
+
+Weather for 12 preloaded global cities
+
+Search & filter cities
+
+Add custom cities (live geocoding search modal)
+
+⭐ Favorites pinned to top (gold highlight)
+
+Skeleton loading animation
+
+Pull-to-refresh
+
+Navigate to Details & Settings
+
+📊 Details
+
+Gradient hero card (temp, condition, feels like)
+
+24-hour horizontal forecast
+
+7-day forecast with range bars
+
+Conditions grid (Humidity, Wind, UV, Pressure)
+
+Color-coded UV badge (Low → Extreme)
+
+Wind level descriptions (Calm → Storm)
+
+Sunrise & Sunset
+
+Relative timestamps (“5m ago”)
+
+Favorite toggle
+
+Pull-to-refresh
+
+⚙️ Settings
+
+Toggle °C / °F (persisted)
+
+Manage favorites
+
+Manage custom cities (with confirmation)
+
+About section (API + version)
+
+🛠️ Tech Stack
+Category	Technology
+Framework	React Native (Expo SDK 55)
+Language	JavaScript (ES6+)
+Navigation	React Navigation v7 (Native Stack)
+State	React Context API + useReducer
+Storage	AsyncStorage
+API	Open-Meteo (no API key required)
+Geocoding	Open-Meteo Geocoding API
+UI	expo-linear-gradient
+Build	EAS Build
+Platform	Android (APK)
