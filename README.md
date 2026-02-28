@@ -22,6 +22,7 @@ Real-time global weather · City favorites · Custom search · Persistent settin
 
 [📥 Download APK](https://expo.dev/accounts/jethzki/projects/WeatherApp/builds/e3ba7cad-38d4-46d3-9151-92176f0e593f)
 
+</br>
 </div>
 
 ---
