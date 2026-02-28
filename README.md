@@ -1,7 +1,7 @@
 <div align="center">
 🌦️ WeatherApp
 
-**A modern, production-ready weather application built with React Native & Expo.**
+**A basic weather application built with React Native & Expo.**
 
 [![Platform](https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white)](https://expo.dev/accounts/jethzki/projects/WeatherApp/builds/e3ba7cad-38d4-46d3-9151-92176f0e593f)
 [![Framework](https://img.shields.io/badge/React_Native-Expo_SDK_55-0ea5e9?logo=expo)](https://expo.dev)
@@ -10,7 +10,7 @@
 
 Real-time global weather · City favorites · Custom search · Persistent settings · Clean modern UI
 
-<br/>
+---
 
 <p>
   <img src="screenshots/home.png" width="220" style="border-radius:12px; margin: 8px"/>
@@ -18,7 +18,7 @@ Real-time global weather · City favorites · Custom search · Persistent settin
   <img src="screenshots/settings.png" width="220" style="border-radius:12px; margin: 8px"/>
 </p>
 
-<br/>
+---
 
 [📥 Download APK](https://expo.dev/accounts/jethzki/projects/WeatherApp/builds/e3ba7cad-38d4-46d3-9151-92176f0e593f)
 
