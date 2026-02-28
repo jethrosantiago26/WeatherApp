@@ -9,12 +9,18 @@ import {
   FlatList,
   RefreshControl,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useWeather } from '../context/WeatherContext';
 import {
   getWeatherIcon,
   getWeatherDescription,
   formatDate,
+  formatTemp,
+  formatTempShort,
   windDirectionLabel,
+  getUVLevel,
+  getWindLevel,
+  timeAgo,
   COLORS,
 } from '../utils/weather';
 
@@ -40,6 +46,7 @@ export default function DetailsScreen({ route, navigation }) {
     loading,
     error,
     lastUpdated,
+    unit,
     fetchWeather,
     isFavorite,
     toggleFavorite,
@@ -106,7 +113,7 @@ export default function DetailsScreen({ route, navigation }) {
   const hourly = data.hourly;
   const weatherCode = current.weather_code;
 
-  // Get the next 24 hours of hourly data
+  // Next 24 hours
   const now = new Date();
   const hourlySlice = [];
   if (hourly) {
@@ -122,12 +129,9 @@ export default function DetailsScreen({ route, navigation }) {
     }
   }
 
-  const lastUp = lastUpdated[cityName]
-    ? new Date(lastUpdated[cityName]).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    : null;
+  const uvRaw = daily?.uv_index_max ? daily.uv_index_max[0] : null;
+  const uv = getUVLevel(uvRaw);
+  const windLabel = getWindLevel(current.wind_speed_10m);
 
   return (
     <ScrollView
@@ -143,28 +147,35 @@ export default function DetailsScreen({ route, navigation }) {
         />
       }
     >
-      {/* Current Weather Hero */}
-      <View style={styles.heroCard}>
+      {/* Hero with gradient */}
+      <LinearGradient
+        colors={[COLORS.heroGradientTop, COLORS.heroGradientBottom]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.heroCard}
+      >
         <Text style={styles.heroIcon}>{getWeatherIcon(weatherCode)}</Text>
         <Text style={styles.heroTemp}>
-          {Math.round(current.temperature_2m)}°C
+          {formatTemp(current.temperature_2m, unit)}
         </Text>
         <Text style={styles.heroDesc}>
           {getWeatherDescription(weatherCode)}
         </Text>
         <Text style={styles.heroFeelsLike}>
-          Feels like {Math.round(current.apparent_temperature)}°C
+          Feels like {formatTemp(current.apparent_temperature, unit)}
         </Text>
         {daily && (
           <Text style={styles.heroHiLo}>
-            H:{Math.round(daily.temperature_2m_max[0])}° L:
-            {Math.round(daily.temperature_2m_min[0])}°
+            H:{formatTempShort(daily.temperature_2m_max[0], unit)}  L:
+            {formatTempShort(daily.temperature_2m_min[0], unit)}
           </Text>
         )}
-        {lastUp && (
-          <Text style={styles.heroUpdated}>Updated at {lastUp}</Text>
+        {lastUpdated[cityName] && (
+          <Text style={styles.heroUpdated}>
+            Updated {timeAgo(lastUpdated[cityName])}
+          </Text>
         )}
-      </View>
+      </LinearGradient>
 
       {/* Hourly Forecast */}
       {hourlySlice.length > 0 && (
@@ -183,7 +194,7 @@ export default function DetailsScreen({ route, navigation }) {
                   {getWeatherIcon(item.code)}
                 </Text>
                 <Text style={styles.hourlyTemp}>
-                  {Math.round(item.temp)}°
+                  {formatTempShort(item.temp, unit)}
                 </Text>
                 {item.precip > 0 && (
                   <Text style={styles.hourlyPrecip}>💧{item.precip}%</Text>
@@ -209,7 +220,9 @@ export default function DetailsScreen({ route, navigation }) {
           <Text style={styles.detailValue}>
             {Math.round(current.wind_speed_10m)} km/h
           </Text>
-          <Text style={styles.detailLabel}>Wind</Text>
+          <Text style={[styles.detailLabel, { color: COLORS.textSecondary }]}>
+            {windLabel}
+          </Text>
         </View>
         <View style={styles.detailItem}>
           <Text style={styles.detailIcon}>🧭</Text>
@@ -232,12 +245,14 @@ export default function DetailsScreen({ route, navigation }) {
         </View>
         {daily && (
           <>
-            <View style={styles.detailItem}>
+            <View style={[styles.detailItem, { borderBottomWidth: 3, borderBottomColor: uv.color }]}>
               <Text style={styles.detailIcon}>☀️</Text>
-              <Text style={styles.detailValue}>
-                {daily.uv_index_max ? daily.uv_index_max[0]?.toFixed(1) : '—'}
+              <Text style={[styles.detailValue, { color: uv.color }]}>
+                {uvRaw != null ? uvRaw.toFixed(1) : '—'}
               </Text>
-              <Text style={styles.detailLabel}>UV Index</Text>
+              <Text style={[styles.detailLabel, { color: uv.color, fontWeight: '600' }]}>
+                {uv.label}
+              </Text>
             </View>
             <View style={styles.detailItem}>
               <Text style={styles.detailIcon}>🌧️</Text>
@@ -291,7 +306,7 @@ export default function DetailsScreen({ route, navigation }) {
               </Text>
               <View style={styles.forecastTemps}>
                 <Text style={styles.forecastHigh}>
-                  {Math.round(daily.temperature_2m_max[index])}°
+                  {formatTempShort(daily.temperature_2m_max[index], unit)}
                 </Text>
                 {/* Temperature bar */}
                 <View style={styles.tempBarContainer}>
@@ -311,7 +326,7 @@ export default function DetailsScreen({ route, navigation }) {
                   />
                 </View>
                 <Text style={styles.forecastLow}>
-                  {Math.round(daily.temperature_2m_min[index])}°
+                  {formatTempShort(daily.temperature_2m_min[index], unit)}
                 </Text>
               </View>
               <Text style={styles.forecastRain}>
@@ -327,9 +342,7 @@ export default function DetailsScreen({ route, navigation }) {
           📍 {city?.latitude?.toFixed(4)}, {city?.longitude?.toFixed(4)}
           {city?.country ? ` · ${city.country}` : ''}
         </Text>
-        <Text style={styles.coordText}>
-          Data from Open-Meteo API
-        </Text>
+        <Text style={styles.coordText}>Data from Open-Meteo API</Text>
       </View>
     </ScrollView>
   );
@@ -374,7 +387,6 @@ const styles = StyleSheet.create({
 
   /* Hero */
   heroCard: {
-    backgroundColor: COLORS.primary,
     borderRadius: 24,
     padding: 28,
     alignItems: 'center',
@@ -520,7 +532,7 @@ const styles = StyleSheet.create({
   sunDivider: {
     width: 1,
     height: 40,
-    backgroundColor: '#E0E8F0',
+    backgroundColor: COLORS.border,
   },
   sunIcon: {
     fontSize: 26,
@@ -577,14 +589,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: COLORS.danger,
-    width: 32,
+    width: 36,
     textAlign: 'right',
   },
   forecastLow: {
     fontSize: 14,
     fontWeight: '600',
     color: COLORS.primary,
-    width: 32,
+    width: 36,
   },
   tempBarContainer: {
     flex: 1,

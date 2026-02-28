@@ -82,10 +82,63 @@ export function getWeatherDescription(code) {
   return WEATHER_DESCRIPTIONS[code] || 'Unknown';
 }
 
+// Temperature conversion
+export function toFahrenheit(celsius) {
+  return (celsius * 9) / 5 + 32;
+}
+
+export function formatTemp(celsius, unit = 'celsius') {
+  if (unit === 'fahrenheit') {
+    return `${Math.round(toFahrenheit(celsius))}°F`;
+  }
+  return `${Math.round(celsius)}°C`;
+}
+
+export function formatTempShort(celsius, unit = 'celsius') {
+  if (unit === 'fahrenheit') {
+    return `${Math.round(toFahrenheit(celsius))}°`;
+  }
+  return `${Math.round(celsius)}°`;
+}
+
+// UV Index level
+export function getUVLevel(uv) {
+  if (uv == null) return { label: '—', color: '#999' };
+  if (uv <= 2) return { label: 'Low', color: '#27AE60' };
+  if (uv <= 5) return { label: 'Moderate', color: '#F5A623' };
+  if (uv <= 7) return { label: 'High', color: '#E67E22' };
+  if (uv <= 10) return { label: 'Very High', color: '#D94A4A' };
+  return { label: 'Extreme', color: '#8E44AD' };
+}
+
+// Wind speed description
+export function getWindLevel(kmh) {
+  if (kmh < 2) return 'Calm';
+  if (kmh < 12) return 'Light';
+  if (kmh < 30) return 'Moderate';
+  if (kmh < 50) return 'Strong';
+  if (kmh < 75) return 'Very Strong';
+  return 'Storm';
+}
+
+// Relative time
+export function timeAgo(isoString) {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  const now = new Date();
+  const diffMin = Math.round((now - d) / 60000);
+  if (diffMin < 1) return 'Just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHrs = Math.round(diffMin / 60);
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  return `${Math.round(diffHrs / 24)}d ago`;
+}
+
 // Color palette
 export const COLORS = {
   primary: '#4A90D9',
   primaryDark: '#2E6DB4',
+  primaryLight: '#6BABEB',
   background: '#E6F4FE',
   card: '#FFFFFF',
   textPrimary: '#1A3A5C',
@@ -96,6 +149,10 @@ export const COLORS = {
   success: '#27AE60',
   warning: '#FFF3CD',
   warningText: '#856404',
-  heroGradientTop: '#4A90D9',
+  border: '#E0E8F0',
+  skeleton: '#E8EFF5',
+  skeletonShine: '#F4F8FC',
+  heroGradientTop: '#5B9FE3',
   heroGradientBottom: '#2E6DB4',
+  settingsBg: '#F0F6FC',
 };

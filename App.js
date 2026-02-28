@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { WeatherProvider } from './src/context/WeatherContext';
 import HomeScreen from './src/screens/HomeScreen';
 import DetailsScreen from './src/screens/DetailsScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -37,6 +38,15 @@ export default function App() {
                 title: route.params?.cityName || 'Weather Details',
                 headerBackTitle: 'Back',
               })}
+            />
+            <Stack.Screen
+              name="Settings"
+              component={SettingsScreen}
+              options={{
+                title: 'Settings',
+                headerBackTitle: 'Back',
+                animation: 'slide_from_bottom',
+              }}
             />
           </Stack.Navigator>
           <StatusBar style="auto" />

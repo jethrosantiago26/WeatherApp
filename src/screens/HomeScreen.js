@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,15 +9,175 @@ import {
   RefreshControl,
   TextInput,
   Animated,
+  Modal,
+  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWeather } from '../context/WeatherContext';
 import {
   getWeatherIcon,
   getWeatherDescription,
+  formatTemp,
+  formatTempShort,
+  timeAgo,
   COLORS,
 } from '../utils/weather';
 
+/* ---------- Skeleton shimmer card ---------- */
+function SkeletonCard() {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, { toValue: 1, duration: 900, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0, duration: 900, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+  const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.7] });
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardBody}>
+        <View style={styles.cardLeft}>
+          <Animated.View style={[styles.skelBar, { width: 120, opacity }]} />
+          <Animated.View style={[styles.skelBar, { width: 90, marginTop: 8, opacity }]} />
+          <Animated.View style={[styles.skelBar, { width: 60, marginTop: 6, opacity }]} />
+        </View>
+        <View style={styles.cardRight}>
+          <Animated.View style={[styles.skelCircle, { opacity }]} />
+          <Animated.View style={[styles.skelBar, { width: 50, marginTop: 8, opacity }]} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/* ---------- Add‑City Modal ---------- */
+function AddCityModal({ visible, onClose }) {
+  const {
+    searchResults,
+    searching,
+    searchCities,
+    addCustomCity,
+    clearSearchResults,
+    fetchWeather,
+    cities,
+  } = useWeather();
+  const [query, setQuery] = useState('');
+  const timer = useRef(null);
+
+  const handleChange = (text) => {
+    setQuery(text);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => searchCities(text), 350);
+  };
+
+  const handleAdd = (result) => {
+    const city = {
+      name: result.name,
+      latitude: result.latitude,
+      longitude: result.longitude,
+      country: result.country,
+      admin: result.admin,
+    };
+    addCustomCity(city);
+    fetchWeather(city);
+    setQuery('');
+    clearSearchResults();
+    onClose();
+  };
+
+  const handleClose = () => {
+    setQuery('');
+    clearSearchResults();
+    onClose();
+  };
+
+  const alreadyAdded = (name) => cities.some((c) => c.name === name);
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={handleClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Add City</Text>
+            <TouchableOpacity onPress={handleClose}>
+              <Text style={styles.modalClose}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.modalSearchBox}>
+            <Text style={styles.searchIcon}>🔍</Text>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search worldwide..."
+              placeholderTextColor={COLORS.textMuted}
+              value={query}
+              onChangeText={handleChange}
+              autoFocus
+              autoCorrect={false}
+              returnKeyType="search"
+            />
+            {query.length > 0 && (
+              <TouchableOpacity onPress={() => { setQuery(''); clearSearchResults(); }}>
+                <Text style={styles.clearSearch}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {searching && (
+            <ActivityIndicator style={{ marginTop: 20 }} color={COLORS.primary} />
+          )}
+
+          <FlatList
+            data={searchResults}
+            keyExtractor={(r, i) => `${r.name}-${r.latitude}-${i}`}
+            keyboardShouldPersistTaps="handled"
+            style={{ maxHeight: 320 }}
+            renderItem={({ item }) => {
+              const added = alreadyAdded(item.name);
+              return (
+                <TouchableOpacity
+                  style={styles.resultRow}
+                  onPress={() => !added && handleAdd(item)}
+                  disabled={added}
+                  activeOpacity={0.7}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.resultName, added && { color: COLORS.textMuted }]}>
+                      {item.name}
+                    </Text>
+                    <Text style={styles.resultSub}>
+                      {[item.admin, item.country].filter(Boolean).join(', ')}
+                    </Text>
+                  </View>
+                  {added ? (
+                    <Text style={styles.addedLabel}>Added</Text>
+                  ) : (
+                    <Text style={styles.addBtn}>+</Text>
+                  )}
+                </TouchableOpacity>
+              );
+            }}
+            ListEmptyComponent={
+              query.length >= 2 && !searching ? (
+                <Text style={styles.noResults}>No cities found</Text>
+              ) : query.length < 2 && query.length > 0 ? (
+                <Text style={styles.noResults}>Type at least 2 characters</Text>
+              ) : null
+            }
+          />
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+/* ---------- Home Screen ---------- */
 export default function HomeScreen({ navigation }) {
   const {
     cities,
@@ -26,6 +186,8 @@ export default function HomeScreen({ navigation }) {
     error,
     favorites,
     lastUpdated,
+    unit,
+    isCustomCity,
     fetchWeather,
     selectCity,
     toggleFavorite,
@@ -34,16 +196,18 @@ export default function HomeScreen({ navigation }) {
   } = useWeather();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [showAddCity, setShowAddCity] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(true);
 
   useEffect(() => {
-    cities.forEach((city) => {
-      if (!weatherData[city.name]) {
-        fetchWeather(city);
-      }
+    const promises = cities.map((city) => {
+      if (!weatherData[city.name]) return fetchWeather(city);
+      return Promise.resolve();
     });
-  }, []);
+    Promise.all(promises).then(() => setInitialLoad(false));
+  }, [cities.length]);
 
-  // Sort: favorites first, then alphabetical; filter by search
+  // Sort: favorites first, custom cities tagged, then alphabetical; filter by search
   const filteredCities = useMemo(() => {
     let list = [...cities];
     if (searchQuery.trim()) {
@@ -71,26 +235,11 @@ export default function HomeScreen({ navigation }) {
   const handleCityPress = useCallback(
     (city) => {
       selectCity(city);
-      if (!weatherData[city.name]) {
-        fetchWeather(city);
-      }
+      if (!weatherData[city.name]) fetchWeather(city);
       navigation.navigate('Details', { cityName: city.name });
     },
     [weatherData]
   );
-
-  const formatLastUpdated = (cityName) => {
-    const ts = lastUpdated[cityName];
-    if (!ts) return '';
-    const d = new Date(ts);
-    const now = new Date();
-    const diffMin = Math.round((now - d) / 60000);
-    if (diffMin < 1) return 'Just now';
-    if (diffMin < 60) return `${diffMin}m ago`;
-    const diffHrs = Math.round(diffMin / 60);
-    if (diffHrs < 24) return `${diffHrs}h ago`;
-    return `${Math.round(diffHrs / 24)}d ago`;
-  };
 
   const renderCityCard = ({ item: city }) => {
     const data = weatherData[city.name];
@@ -98,6 +247,9 @@ export default function HomeScreen({ navigation }) {
     const daily = data?.daily;
     const weatherCode = current?.weather_code ?? 0;
     const fav = isFavorite(city.name);
+    const custom = isCustomCity(city.name);
+
+    if (!current && initialLoad) return <SkeletonCard />;
 
     return (
       <TouchableOpacity
@@ -117,8 +269,12 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.cardBody}>
           <View style={styles.cardLeft}>
             <View style={styles.cityRow}>
-              <Text style={styles.cityName}>{city.name}</Text>
-              <Text style={styles.countryBadge}>{city.country}</Text>
+              <Text style={styles.cityName} numberOfLines={1}>
+                {city.name}
+              </Text>
+              <Text style={[styles.countryBadge, custom && styles.customBadge]}>
+                {custom ? '📌 ' : ''}{city.country}
+              </Text>
             </View>
             {current ? (
               <>
@@ -127,8 +283,8 @@ export default function HomeScreen({ navigation }) {
                 </Text>
                 {daily && (
                   <Text style={styles.hiLo}>
-                    H:{Math.round(daily.temperature_2m_max[0])}° L:
-                    {Math.round(daily.temperature_2m_min[0])}°
+                    H:{formatTempShort(daily.temperature_2m_max[0], unit)} L:
+                    {formatTempShort(daily.temperature_2m_min[0], unit)}
                   </Text>
                 )}
               </>
@@ -137,7 +293,7 @@ export default function HomeScreen({ navigation }) {
             )}
             {lastUpdated[city.name] && (
               <Text style={styles.updatedText}>
-                {formatLastUpdated(city.name)}
+                {timeAgo(lastUpdated[city.name])}
               </Text>
             )}
           </View>
@@ -148,10 +304,10 @@ export default function HomeScreen({ navigation }) {
                   {getWeatherIcon(weatherCode)}
                 </Text>
                 <Text style={styles.temperature}>
-                  {Math.round(current.temperature_2m)}°C
+                  {formatTemp(current.temperature_2m, unit)}
                 </Text>
                 <Text style={styles.feelsLike}>
-                  Feels {Math.round(current.apparent_temperature)}°
+                  Feels {formatTempShort(current.apparent_temperature, unit)}
                 </Text>
               </>
             ) : (
@@ -167,10 +323,28 @@ export default function HomeScreen({ navigation }) {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.headerContainer}>
-        <Text style={styles.header}>🌍 Weather</Text>
-        <Text style={styles.subtitle}>
-          {cities.length} cities · {favorites.length} favorites
-        </Text>
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.header}>🌍 Weather</Text>
+            <Text style={styles.subtitle}>
+              {cities.length} cities · {favorites.length} favorites
+            </Text>
+          </View>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              onPress={() => setShowAddCity(true)}
+              style={styles.headerBtn}
+            >
+              <Text style={styles.headerBtnText}>＋</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Settings')}
+              style={styles.headerBtn}
+            >
+              <Text style={styles.headerBtnIcon}>⚙️</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
       {/* Search Bar */}
@@ -178,7 +352,7 @@ export default function HomeScreen({ navigation }) {
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search cities..."
+          placeholder="Filter cities..."
           placeholderTextColor={COLORS.textMuted}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -225,6 +399,12 @@ export default function HomeScreen({ navigation }) {
         }
         showsVerticalScrollIndicator={false}
       />
+
+      {/* Add City Modal */}
+      <AddCityModal
+        visible={showAddCity}
+        onClose={() => setShowAddCity(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -239,6 +419,11 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 4,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
   header: {
     fontSize: 32,
     fontWeight: '800',
@@ -248,6 +433,34 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.textSecondary,
     marginTop: 2,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+  },
+  headerBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: COLORS.card,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  headerBtnText: {
+    fontSize: 22,
+    color: COLORS.primary,
+    fontWeight: '600',
+    lineHeight: 26,
+  },
+  headerBtnIcon: {
+    fontSize: 18,
   },
 
   /* Search */
@@ -334,6 +547,7 @@ const styles = StyleSheet.create({
     fontSize: 19,
     fontWeight: '700',
     color: COLORS.textPrimary,
+    flexShrink: 1,
   },
   countryBadge: {
     fontSize: 11,
@@ -344,6 +558,10 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
     overflow: 'hidden',
+  },
+  customBadge: {
+    backgroundColor: '#FFF3E0',
+    color: '#E67E22',
   },
   weatherDesc: {
     fontSize: 13,
@@ -379,6 +597,19 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
 
+  /* Skeleton */
+  skelBar: {
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: COLORS.skeleton,
+  },
+  skelCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.skeleton,
+  },
+
   /* Error */
   errorBox: {
     backgroundColor: COLORS.warning,
@@ -405,5 +636,82 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.textSecondary,
     marginTop: 8,
+  },
+
+  /* Modal */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: COLORS.card,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 40,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.border,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  modalClose: {
+    fontSize: 20,
+    color: COLORS.textSecondary,
+    padding: 4,
+  },
+  modalSearchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.settingsBg,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 8,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 44,
+  },
+  resultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.border,
+  },
+  resultName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  resultSub: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 1,
+  },
+  addedLabel: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+    fontStyle: 'italic',
+  },
+  addBtn: {
+    fontSize: 24,
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+  noResults: {
+    textAlign: 'center',
+    padding: 20,
+    color: COLORS.textSecondary,
+    fontSize: 14,
   },
 });
