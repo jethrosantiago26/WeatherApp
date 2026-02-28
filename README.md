@@ -34,47 +34,5 @@ Pull-to-refresh
 
 Navigate to Details & Settings
 
-📊 Details
-
-Gradient hero card (temp, condition, feels like)
-
-24-hour horizontal forecast
-
-7-day forecast with range bars
-
-Conditions grid (Humidity, Wind, UV, Pressure)
-
-Color-coded UV badge (Low → Extreme)
-
-Wind level descriptions (Calm → Storm)
-
-Sunrise & Sunset
-
-Relative timestamps (“5m ago”)
-
-Favorite toggle
-
-Pull-to-refresh
-
-⚙️ Settings
-
-Toggle °C / °F (persisted)
-
-Manage favorites
-
-Manage custom cities (with confirmation)
-
-About section (API + version)
-
 🛠️ Tech Stack
-Category	Technology
-Framework	React Native (Expo SDK 55)
-Language	JavaScript (ES6+)
-Navigation	React Navigation v7 (Native Stack)
-State	React Context API + useReducer
-Storage	AsyncStorage
-API	Open-Meteo (no API key required)
-Geocoding	Open-Meteo Geocoding API
-UI	expo-linear-gradient
-Build	EAS Build
-Platform	Android (APK)
+<table> <tr> <td align="center"><strong>Framework</strong></td> <td align="center"><strong>Language</strong></td> <td align="center"><strong>Navigation</strong></td> <td align="center"><strong>State</strong></td> </tr> <tr> <td align="center"> <img src="https://skillicons.dev/icons?i=react" width="50"/><br/> React Native <br/><br/> <img src="https://skillicons.dev/icons?i=expo" width="50"/><br/> Expo SDK 55 </td> <td align="center"> <img src="https://skillicons.dev/icons?i=javascript" width="50"/><br/> JavaScript (ES6+) </td> <td align="center"> <img src="https://skillicons.dev/icons?i=react" width="50"/><br/> React Navigation v7 </td> <td align="center"> <img src="https://skillicons.dev/icons?i=react" width="50"/><br/> Context API<br/>+ useReducer </td> </tr> <tr> <td align="center"><strong>Storage</strong></td> <td align="center"><strong>API</strong></td> <td align="center"><strong>UI</strong></td> <td align="center"><strong>Build</strong></td> </tr> <tr> <td align="center"> <img src="https://skillicons.dev/icons?i=react" width="50"/><br/> AsyncStorage </td> <td align="center"> <img src="https://skillicons.dev/icons?i=cloud" width="50"/><br/> Open-Meteo API<br/> Geocoding API </td> <td align="center"> <img src="https://skillicons.dev/icons?i=expo" width="50"/><br/> expo-linear-gradient </td> <td align="center"> <img src="https://skillicons.dev/icons?i=android" width="50"/><br/> Android APK <br/><br/> <img src="https://skillicons.dev/icons?i=expo" width="50"/><br/> EAS Build </td> </tr> </table>
